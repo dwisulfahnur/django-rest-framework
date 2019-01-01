@@ -19,9 +19,9 @@ Create a new Django project named `tutorial`, then start a new app called `quick
     pip install djangorestframework
 
     # Set up a new project with a single application
-    django-admin.py startproject tutorial .  # Note the trailing '.' character
+    django-admin startproject tutorial .  # Note the trailing '.' character
     cd tutorial
-    django-admin.py startapp quickstart
+    django-admin startapp quickstart
     cd ..
 
 The project layout should look like:
@@ -46,7 +46,7 @@ The project layout should look like:
     ./tutorial/urls.py
     ./tutorial/wsgi.py
 
-It may look unusual that the application has been created within the project directory. Using the project's namespace avoids name clashes with external module (topic goes outside the scope of the quickstart).
+It may look unusual that the application has been created within the project directory. Using the project's namespace avoids name clashes with external modules (a topic that goes outside the scope of the quickstart).
 
 Now sync your database for the first time:
 
@@ -56,7 +56,7 @@ We'll also create an initial user named `admin` with a password of `password123`
 
     python manage.py createsuperuser --email admin@example.com --username admin
 
-Once you've set up a database and initial user created and ready to go, open up the app's directory and we'll get coding...
+Once you've set up a database and the initial user is created and ready to go, open up the app's directory and we'll get coding...
 
 ## Serializers
 
@@ -77,7 +77,7 @@ First up we're going to define some serializers. Let's create a new module named
             model = Group
             fields = ('url', 'name')
 
-Notice that we're using hyperlinked relations in this case, with `HyperlinkedModelSerializer`.  You can also use primary key and various other relationships, but hyperlinking is good RESTful design.
+Notice that we're using hyperlinked relations in this case with `HyperlinkedModelSerializer`.  You can also use primary key and various other relationships, but hyperlinking is good RESTful design.
 
 ## Views
 
@@ -132,6 +132,14 @@ Again, if we need more control over the API URLs we can simply drop down to usin
 
 Finally, we're including default login and logout views for use with the browsable API.  That's optional, but useful if your API requires authentication and you want to use the browsable API.
 
+## Pagination
+Pagination allows you to control how many objects per page are returned. To enable it add the following lines to `tutorial/settings.py`
+    
+    REST_FRAMEWORK = {
+        'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
+        'PAGE_SIZE': 10
+    }
+    
 ## Settings
 
 Add `'rest_framework'` to `INSTALLED_APPS`. The settings module will be in `tutorial/settings.py`

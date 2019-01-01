@@ -1,5 +1,6 @@
 from __future__ import unicode_literals
 
+import warnings
 from collections import namedtuple
 
 import pytest
@@ -7,11 +8,11 @@ from django.conf.urls import include, url
 from django.core.exceptions import ImproperlyConfigured
 from django.db import models
 from django.test import TestCase, override_settings
-from django.urls import resolve
+from django.urls import resolve, reverse
 
 from rest_framework import permissions, serializers, viewsets
 from rest_framework.compat import get_regex_pattern
-from rest_framework.decorators import detail_route, list_route
+from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.routers import DefaultRouter, SimpleRouter
 from rest_framework.test import APIRequestFactory, URLPatternsTestCase
@@ -67,12 +68,12 @@ class EmptyPrefixViewSet(viewsets.ModelViewSet):
 
 
 class RegexUrlPathViewSet(viewsets.ViewSet):
-    @list_route(url_path='list/(?P<kwarg>[0-9]{4})')
+    @action(detail=False, url_path='list/(?P<kwarg>[0-9]{4})')
     def regex_url_path_list(self, request, *args, **kwargs):
         kwarg = self.kwargs.get('kwarg', '')
         return Response({'kwarg': kwarg})
 
-    @detail_route(url_path='detail/(?P<kwarg>[0-9]{4})')
+    @action(detail=True, url_path='detail/(?P<kwarg>[0-9]{4})')
     def regex_url_path_detail(self, request, *args, **kwargs):
         pk = self.kwargs.get('pk', '')
         kwarg = self.kwargs.get('kwarg', '')
@@ -86,61 +87,76 @@ kwarged_notes_router = SimpleRouter()
 kwarged_notes_router.register(r'notes', KWargedNoteViewSet)
 
 namespaced_router = DefaultRouter()
-namespaced_router.register(r'example', MockViewSet, base_name='example')
+namespaced_router.register(r'example', MockViewSet, basename='example')
 
 empty_prefix_router = SimpleRouter()
-empty_prefix_router.register(r'', EmptyPrefixViewSet, base_name='empty_prefix')
+empty_prefix_router.register(r'', EmptyPrefixViewSet, basename='empty_prefix')
 
 regex_url_path_router = SimpleRouter()
-regex_url_path_router.register(r'', RegexUrlPathViewSet, base_name='regex')
+regex_url_path_router.register(r'', RegexUrlPathViewSet, basename='regex')
 
 
 class BasicViewSet(viewsets.ViewSet):
     def list(self, request, *args, **kwargs):
         return Response({'method': 'list'})
 
-    @detail_route(methods=['post'])
+    @action(methods=['post'], detail=True)
     def action1(self, request, *args, **kwargs):
         return Response({'method': 'action1'})
 
-    @detail_route(methods=['post'])
+    @action(methods=['post', 'delete'], detail=True)
     def action2(self, request, *args, **kwargs):
         return Response({'method': 'action2'})
 
-    @detail_route(methods=['post', 'delete'])
-    def action3(self, request, *args, **kwargs):
-        return Response({'method': 'action2'})
+    @action(methods=['post'], detail=True)
+    def action3(self, request, pk, *args, **kwargs):
+        return Response({'post': pk})
 
-    @detail_route()
-    def link1(self, request, *args, **kwargs):
-        return Response({'method': 'link1'})
-
-    @detail_route()
-    def link2(self, request, *args, **kwargs):
-        return Response({'method': 'link2'})
+    @action3.mapping.delete
+    def action3_delete(self, request, pk, *args, **kwargs):
+        return Response({'delete': pk})
 
 
-class TestSimpleRouter(TestCase):
+class TestSimpleRouter(URLPatternsTestCase, TestCase):
+    router = SimpleRouter()
+    router.register('basics', BasicViewSet, base_name='basic')
+
+    urlpatterns = [
+        url(r'^api/', include(router.urls)),
+    ]
+
     def setUp(self):
         self.router = SimpleRouter()
 
-    def test_link_and_action_decorator(self):
-        routes = self.router.get_routes(BasicViewSet)
-        decorator_routes = routes[2:]
-        # Make sure all these endpoints exist and none have been clobbered
-        for i, endpoint in enumerate(['action1', 'action2', 'action3', 'link1', 'link2']):
-            route = decorator_routes[i]
-            # check url listing
-            assert route.url == '^{{prefix}}/{{lookup}}/{0}{{trailing_slash}}$'.format(endpoint)
-            # check method to function mapping
-            if endpoint == 'action3':
-                methods_map = ['post', 'delete']
-            elif endpoint.startswith('action'):
-                methods_map = ['post']
-            else:
-                methods_map = ['get']
-            for method in methods_map:
-                assert route.mapping[method] == endpoint
+    def test_action_routes(self):
+        # Get action routes (first two are list/detail)
+        routes = self.router.get_routes(BasicViewSet)[2:]
+
+        assert routes[0].url == '^{prefix}/{lookup}/action1{trailing_slash}$'
+        assert routes[0].mapping == {
+            'post': 'action1',
+        }
+
+        assert routes[1].url == '^{prefix}/{lookup}/action2{trailing_slash}$'
+        assert routes[1].mapping == {
+            'post': 'action2',
+            'delete': 'action2',
+        }
+
+        assert routes[2].url == '^{prefix}/{lookup}/action3{trailing_slash}$'
+        assert routes[2].mapping == {
+            'post': 'action3',
+            'delete': 'action3_delete',
+        }
+
+    def test_multiple_action_handlers(self):
+        # Standard action
+        response = self.client.post(reverse('basic-action3', args=[1]))
+        assert response.data == {'post': '1'}
+
+        # Additional handler registered with MethodMapper
+        response = self.client.delete(reverse('basic-action3', args=[1]))
+        assert response.data == {'delete': '1'}
 
 
 class TestRootView(URLPatternsTestCase, TestCase):
@@ -297,14 +313,14 @@ class TestActionKeywordArgs(TestCase):
         class TestViewSet(viewsets.ModelViewSet):
             permission_classes = []
 
-            @detail_route(methods=['post'], permission_classes=[permissions.AllowAny])
+            @action(methods=['post'], detail=True, permission_classes=[permissions.AllowAny])
             def custom(self, request, *args, **kwargs):
                 return Response({
                     'permission_classes': self.permission_classes
                 })
 
         self.router = SimpleRouter()
-        self.router.register(r'test', TestViewSet, base_name='test')
+        self.router.register(r'test', TestViewSet, basename='test')
         self.view = self.router.urls[-1].callback
 
     def test_action_kwargs(self):
@@ -315,21 +331,21 @@ class TestActionKeywordArgs(TestCase):
 
 class TestActionAppliedToExistingRoute(TestCase):
     """
-    Ensure `@detail_route` decorator raises an except when applied
+    Ensure `@action` decorator raises an except when applied
     to an existing route
     """
 
     def test_exception_raised_when_action_applied_to_existing_route(self):
         class TestViewSet(viewsets.ModelViewSet):
 
-            @detail_route(methods=['post'])
+            @action(methods=['post'], detail=True)
             def retrieve(self, request, *args, **kwargs):
                 return Response({
                     'hello': 'world'
                 })
 
         self.router = SimpleRouter()
-        self.router.register(r'test', TestViewSet, base_name='test')
+        self.router.register(r'test', TestViewSet, basename='test')
 
         with pytest.raises(ImproperlyConfigured):
             self.router.urls
@@ -339,27 +355,27 @@ class DynamicListAndDetailViewSet(viewsets.ViewSet):
     def list(self, request, *args, **kwargs):
         return Response({'method': 'list'})
 
-    @list_route(methods=['post'])
+    @action(methods=['post'], detail=False)
     def list_route_post(self, request, *args, **kwargs):
         return Response({'method': 'action1'})
 
-    @detail_route(methods=['post'])
+    @action(methods=['post'], detail=True)
     def detail_route_post(self, request, *args, **kwargs):
         return Response({'method': 'action2'})
 
-    @list_route()
+    @action(detail=False)
     def list_route_get(self, request, *args, **kwargs):
         return Response({'method': 'link1'})
 
-    @detail_route()
+    @action(detail=True)
     def detail_route_get(self, request, *args, **kwargs):
         return Response({'method': 'link2'})
 
-    @list_route(url_path="list_custom-route")
+    @action(detail=False, url_path="list_custom-route")
     def list_custom_route_get(self, request, *args, **kwargs):
         return Response({'method': 'link1'})
 
-    @detail_route(url_path="detail_custom-route")
+    @action(detail=True, url_path="detail_custom-route")
     def detail_custom_route_get(self, request, *args, **kwargs):
         return Response({'method': 'link2'})
 
@@ -455,8 +471,82 @@ class TestViewInitkwargs(URLPatternsTestCase, TestCase):
 
         assert initkwargs['suffix'] == 'List'
 
+    def test_detail(self):
+        match = resolve('/example/notes/')
+        initkwargs = match.func.initkwargs
+
+        assert not initkwargs['detail']
+
     def test_basename(self):
         match = resolve('/example/notes/')
         initkwargs = match.func.initkwargs
 
         assert initkwargs['basename'] == 'routertestmodel'
+
+
+class TestBaseNameRename(TestCase):
+
+    def test_base_name_and_basename_assertion(self):
+        router = SimpleRouter()
+
+        msg = "Do not provide both the `basename` and `base_name` arguments."
+        with warnings.catch_warnings(record=True) as w, \
+                self.assertRaisesMessage(AssertionError, msg):
+            warnings.simplefilter('always')
+            router.register('mock', MockViewSet, 'mock', base_name='mock')
+
+        msg = "The `base_name` argument is pending deprecation in favor of `basename`."
+        assert len(w) == 1
+        assert str(w[0].message) == msg
+
+    def test_base_name_argument_deprecation(self):
+        router = SimpleRouter()
+
+        with pytest.warns(PendingDeprecationWarning) as w:
+            warnings.simplefilter('always')
+            router.register('mock', MockViewSet, base_name='mock')
+
+        msg = "The `base_name` argument is pending deprecation in favor of `basename`."
+        assert len(w) == 1
+        assert str(w[0].message) == msg
+        assert router.registry == [
+            ('mock', MockViewSet, 'mock'),
+        ]
+
+    def test_basename_argument_no_warnings(self):
+        router = SimpleRouter()
+
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter('always')
+            router.register('mock', MockViewSet, basename='mock')
+
+        assert len(w) == 0
+        assert router.registry == [
+            ('mock', MockViewSet, 'mock'),
+        ]
+
+    def test_get_default_base_name_deprecation(self):
+        msg = "`CustomRouter.get_default_base_name` method should be renamed `get_default_basename`."
+
+        # Class definition should raise a warning
+        with pytest.warns(PendingDeprecationWarning) as w:
+            warnings.simplefilter('always')
+
+            class CustomRouter(SimpleRouter):
+                def get_default_base_name(self, viewset):
+                    return 'foo'
+
+        assert len(w) == 1
+        assert str(w[0].message) == msg
+
+        # Deprecated method implementation should still be called
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter('always')
+
+            router = CustomRouter()
+            router.register('mock', MockViewSet)
+
+        assert len(w) == 0
+        assert router.registry == [
+            ('mock', MockViewSet, 'foo'),
+        ]

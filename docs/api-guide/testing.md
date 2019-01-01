@@ -119,7 +119,7 @@ Extends [Django's existing `Client` class][client].
 
 ## Making requests
 
-The `APIClient` class supports the same request interface as Django's standard `Client` class.  This means the that standard `.get()`, `.post()`, `.put()`, `.patch()`, `.delete()`, `.head()` and `.options()` methods are all available.  For example:
+The `APIClient` class supports the same request interface as Django's standard `Client` class.  This means that the standard `.get()`, `.post()`, `.put()`, `.patch()`, `.delete()`, `.head()` and `.options()` methods are all available.  For example:
 
     from rest_framework.test import APIClient
 
@@ -201,6 +201,8 @@ live environment. (See "Live tests" below.)
 This exposes exactly the same interface as if you were using a requests session
 directly.
 
+    from rest_framework.test import RequestsClient
+    
     client = RequestsClient()
     response = client.get('http://testserver/users/')
     assert response.status_code == 200
@@ -237,12 +239,12 @@ For example...
     client = RequestsClient()
 
     # Obtain a CSRF token.
-    response = client.get('/homepage/')
+    response = client.get('http://testserver/homepage/')
     assert response.status_code == 200
     csrftoken = response.cookies['csrftoken']
 
     # Interact with the API.
-    response = client.post('/organisations/', json={
+    response = client.post('http://testserver/organisations/', json={
         'name': 'MegaCorp',
         'status': 'active'
     }, headers={'X-CSRFToken': csrftoken})

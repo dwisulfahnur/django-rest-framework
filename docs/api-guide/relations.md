@@ -2,11 +2,9 @@ source: relations.py
 
 # Serializer relations
 
-> Bad programmers worry about the code.
-> Good programmers worry about data structures and their relationships.
+> Data structures, not algorithms, are central to programming.
 >
-> &mdash; [Linus Torvalds][cite]
-
+> &mdash; [Rob Pike][cite]
 
 Relational fields are used to represent model relationships.  They can be applied to `ForeignKey`, `ManyToManyField` and `OneToOneField` relationships, as well as to reverse relationships, and custom relationships such as `GenericForeignKey`.
 
@@ -24,7 +22,7 @@ To do so, open the Django shell, using `python manage.py shell`, then import the
 
     >>> from myapp.serializers import AccountSerializer
     >>> serializer = AccountSerializer()
-    >>> print repr(serializer)  # Or `print(repr(serializer))` in Python 3.x.
+    >>> print(repr(serializer))
     AccountSerializer():
         id = IntegerField(label='ID', read_only=True)
         name = CharField(allow_blank=True, max_length=100, required=False)
@@ -384,7 +382,7 @@ The `get_url` method is used to map the object instance to its URL representatio
 May raise a `NoReverseMatch` if the `view_name` and `lookup_field`
 attributes are not configured to correctly match the URL conf.
 
-**get_object(self, queryset, view_name, view_args, view_kwargs)**
+**get_object(self, view_name, view_args, view_kwargs)**
 
 If you want to support a writable hyperlinked field then you'll also want to override `get_object`, in order to map incoming URLs back to the object they represent. For read-only hyperlinked fields there is no need to override this method.
 
@@ -592,9 +590,9 @@ The [drf-nested-routers package][drf-nested-routers] provides routers and relati
 
 The [rest-framework-generic-relations][drf-nested-relations] library provides read/write serialization for generic foreign keys.
 
-[cite]: https://lwn.net/Articles/193245/
+[cite]: http://users.ece.utexas.edu/~adnan/pike.html
 [reverse-relationships]: https://docs.djangoproject.com/en/stable/topics/db/queries/#following-relationships-backward
-[routers]: http://www.django-rest-framework.org/api-guide/routers#defaultrouter
+[routers]: https://www.django-rest-framework.org/api-guide/routers#defaultrouter
 [generic-relations]: https://docs.djangoproject.com/en/stable/ref/contrib/contenttypes/#id1
 [drf-nested-routers]: https://github.com/alanjds/drf-nested-routers
 [drf-nested-relations]: https://github.com/Ian-Foote/rest-framework-generic-relations

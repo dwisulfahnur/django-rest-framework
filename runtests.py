@@ -7,13 +7,13 @@ import sys
 import pytest
 
 PYTEST_ARGS = {
-    'default': ['tests', '--tb=short', '-s', '-rw'],
-    'fast': ['tests', '--tb=short', '-q', '-s', '-rw'],
+    'default': [],
+    'fast': ['-q'],
 }
 
 FLAKE8_ARGS = ['rest_framework', 'tests']
 
-ISORT_ARGS = ['--recursive', '--check-only', '-o' 'uritemplate', '-p', 'tests', 'rest_framework', 'tests']
+ISORT_ARGS = ['--recursive', '--check-only', '--diff', '-o' 'uritemplate', '-p', 'tests', 'rest_framework', 'tests']
 
 
 def exit_on_failure(ret, message=None):
@@ -91,10 +91,9 @@ if __name__ == "__main__":
             pass
         else:
             pytest_args = [
-                '--cov-report',
-                'xml',
-                '--cov',
-                'rest_framework'] + pytest_args
+                '--cov', '.',
+                '--cov-report', 'xml',
+            ] + pytest_args
 
         if first_arg.startswith('-'):
             # `runtests.py [flags]`

@@ -102,6 +102,27 @@ Or, if you're using the `@api_view` decorator with function based views.
 
 __Note:__ when you set new permission classes through class attribute or decorators you're telling the view to ignore the default list set over the __settings.py__ file.
 
+Provided they inherit from `rest_framework.permissions.BasePermission`, permissions can be composed using standard Python bitwise operators. For example, `IsAuthenticatedOrReadOnly` could be written:
+
+    from rest_framework.permissions import BasePermission, IsAuthenticated, SAFE_METHODS
+    from rest_framework.response import Response
+    from rest_framework.views import APIView
+
+    class ReadOnly(BasePermission):
+        def has_permission(self, request, view):
+            return request.method in SAFE_METHODS
+
+    class ExampleView(APIView):
+        permission_classes = (IsAuthenticated|ReadOnly,)
+
+        def get(self, request, format=None):
+            content = {
+                'status': 'request was permitted'
+            }
+            return Response(content)
+
+__Note:__ it only supports & -and- and | -or-.
+
 ---
 
 # API Reference
@@ -168,9 +189,7 @@ As with `DjangoModelPermissions` you can use custom model permissions by overrid
 
 ---
 
-**Note**: If you need object level `view` permissions for `GET`, `HEAD` and `OPTIONS` requests, you'll want to consider also adding the `DjangoObjectPermissionsFilter` class to ensure that list endpoints only return results including objects for which the user has appropriate view permissions.
-
----
+**Note**: If you need object level `view` permissions for `GET`, `HEAD` and `OPTIONS` requests and are using django-guardian for your object-level permissions backend, you'll want to consider using the `DjangoObjectPermissionsFilter` class provided by the [`djangorestframework-guardian` package][django-rest-framework-guardian]. It ensures that list endpoints only return results including objects for which the user has appropriate view permissions.
 
 ---
 
@@ -255,7 +274,7 @@ The [Composed Permissions][composed-permissions] package provides a simple way t
 
 ## REST Condition
 
-The [REST Condition][rest-condition] package is another extension for building complex permissions in a simple and convenient way.  The extension allows you to combine permissions with logical operators.
+The [REST Condition][rest-condition] package is another extension for building complex permissions in a simple and convenient way. The extension allows you to combine permissions with logical operators.
 
 ## DRY Rest Permissions
 
@@ -268,6 +287,10 @@ The [Django Rest Framework Roles][django-rest-framework-roles] package makes it 
 ## Django Rest Framework API Key
 
 The [Django Rest Framework API Key][django-rest-framework-api-key] package allows you to ensure that every request made to the server requires an API key header. You can generate one from the django admin interface.
+
+## Django Rest Framework Role Filters
+
+The [Django Rest Framework Role Filters][django-rest-framework-role-filters] package provides simple filtering over multiple types of roles.
 
 [cite]: https://developer.apple.com/library/mac/#documentation/security/Conceptual/AuthenticationAndAuthorizationGuide/Authorization/Authorization.html
 [authentication]: authentication.md
@@ -282,3 +305,5 @@ The [Django Rest Framework API Key][django-rest-framework-api-key] package allow
 [dry-rest-permissions]: https://github.com/Helioscene/dry-rest-permissions
 [django-rest-framework-roles]: https://github.com/computer-lab/django-rest-framework-roles
 [django-rest-framework-api-key]: https://github.com/manosim/django-rest-framework-api-key
+[django-rest-framework-role-filters]: https://github.com/allisson/django-rest-framework-role-filters
+[django-rest-framework-guardian]: https://github.com/rpkilby/django-rest-framework-guardian

@@ -12,7 +12,7 @@ from rest_framework.compat import postgres_fields
 from rest_framework.validators import UniqueValidator
 
 NUMERIC_FIELD_TYPES = (
-    models.IntegerField, models.FloatField, models.DecimalField
+    models.IntegerField, models.FloatField, models.DecimalField, models.DurationField,
 )
 
 
@@ -87,6 +87,9 @@ def get_field_kwargs(field_name, model_field):
     decimal_places = getattr(model_field, 'decimal_places', None)
     if decimal_places is not None:
         kwargs['decimal_places'] = decimal_places
+
+    if isinstance(model_field, models.SlugField):
+        kwargs['allow_unicode'] = model_field.allow_unicode
 
     if isinstance(model_field, models.TextField) or (postgres_fields and isinstance(model_field, postgres_fields.JSONField)):
         kwargs['style'] = {'base_template': 'textarea.html'}

@@ -57,10 +57,10 @@ At this point we've translated the model instance into Python native datatypes. 
 
 Deserialization is similar. First we parse a stream into Python native datatypes...
 
-    from django.utils.six import BytesIO
+    import io
     from rest_framework.parsers import JSONParser
 
-    stream = BytesIO(json)
+    stream = io.BytesIO(json)
     data = JSONParser().parse(stream)
 
 ...then we restore those native datatypes into a dictionary of validated data.
@@ -197,7 +197,7 @@ Your `validate_<field_name>` methods should return the validated value or raise 
 
 #### Object-level validation
 
-To do any other validation that requires access to multiple fields, add a method called `.validate()` to your `Serializer` subclass.  This method takes a single argument, which is a dictionary of field values.  It should raise a `ValidationError` if necessary, or just return the validated values.  For example:
+To do any other validation that requires access to multiple fields, add a method called `.validate()` to your `Serializer` subclass.  This method takes a single argument, which is a dictionary of field values.  It should raise a `serializers.ValidationError` if necessary, or just return the validated values.  For example:
 
     from rest_framework import serializers
 
@@ -208,7 +208,7 @@ To do any other validation that requires access to multiple fields, add a method
 
         def validate(self, data):
             """
-            Check that the start is before the stop.
+            Check that start is before finish.
             """
             if data['start'] > data['finish']:
                 raise serializers.ValidationError("finish must occur after start")
@@ -906,7 +906,7 @@ Or use it to serialize multiple instances:
 
 ##### Read-write `BaseSerializer` classes
 
-To create a read-write serializer we first need to implement a `.to_internal_value()` method. This method returns the validated values that will be used to construct the object instance, and may raise a `ValidationError` if the supplied data is in an incorrect format.
+To create a read-write serializer we first need to implement a `.to_internal_value()` method. This method returns the validated values that will be used to construct the object instance, and may raise a `serializers.ValidationError` if the supplied data is in an incorrect format.
 
 Once you've implemented `.to_internal_value()`, the basic validation API will be available on the serializer, and you will be able to use `.is_valid()`, `.validated_data` and `.errors`.
 
@@ -921,15 +921,15 @@ Here's a complete example of our previous `HighScoreSerializer`, that's been upd
 
             # Perform the data validation.
             if not score:
-                raise ValidationError({
+                raise serializers.ValidationError({
                     'score': 'This field is required.'
                 })
             if not player_name:
-                raise ValidationError({
+                raise serializers.ValidationError({
                     'player_name': 'This field is required.'
                 })
             if len(player_name) > 10:
-                raise ValidationError({
+                raise serializers.ValidationError({
                     'player_name': 'May not be more than 10 characters.'
                 })
 
@@ -1030,7 +1030,7 @@ Similar to Django forms, you can extend and reuse serializers through inheritanc
     class MyBaseSerializer(Serializer):
         my_field = serializers.CharField()
 
-        def validate_my_field(self):
+        def validate_my_field(self, value):
             ...
 
     class MySerializer(MyBaseSerializer):
@@ -1174,7 +1174,7 @@ The [drf-writable-nested][drf-writable-nested] package provides writable nested 
 [model-managers]: https://docs.djangoproject.com/en/stable/topics/db/managers/
 [encapsulation-blogpost]: https://www.dabapps.com/blog/django-models-and-encapsulation/
 [thirdparty-writable-nested]: serializers.md#drf-writable-nested
-[django-rest-marshmallow]: https://tomchristie.github.io/django-rest-marshmallow/
+[django-rest-marshmallow]: https://marshmallow-code.github.io/django-rest-marshmallow/
 [marshmallow]: https://marshmallow.readthedocs.io/en/latest/
 [serpy]: https://github.com/clarkduvall/serpy
 [mongoengine]: https://github.com/umutbozkurt/django-rest-framework-mongoengine

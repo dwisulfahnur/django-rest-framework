@@ -41,14 +41,6 @@ Setting this to `False` also allows the object attribute or dictionary key to be
 
 Defaults to `True`.
 
-### `allow_null`
-
-Normally an error will be raised if `None` is passed to a serializer field. Set this keyword argument to `True` if `None` should be considered a valid value.
-
-Note that setting this argument to `True` will imply a default value of `null` for serialization output, but does not imply a default for input deserialization.
-
-Defaults to `False`
-
 ### `default`
 
 If set, this gives the default value that will be used for the field if no input value is supplied. If not set the default behaviour is to not populate the attribute at all.
@@ -60,6 +52,14 @@ May be set to a function or other callable, in which case the value will be eval
 When serializing the instance, default will be used if the the object attribute or dictionary key is not present in the instance.
 
 Note that setting a `default` value implies that the field is not required. Including both the `default` and `required` keyword arguments is invalid and will raise an error.
+
+### `allow_null`
+
+Normally an error will be raised if `None` is passed to a serializer field. Set this keyword argument to `True` if `None` should be considered a valid value.
+
+Note that, without an explicit `default`, setting this argument to `True` will imply a `default` value of `null` for serialization output, but does not imply a default for input deserialization.
+
+Defaults to `False`
 
 ### `source`
 
@@ -360,7 +360,10 @@ Corresponds to `django.db.models.fields.DurationField`
 The `validated_data` for these fields will contain a `datetime.timedelta` instance.
 The representation is a string following this format `'[DD] [HH:[MM:]]ss[.uuuuuu]'`.
 
-**Signature:** `DurationField()`
+**Signature:** `DurationField(max_value=None, min_value=None)`
+
+- `max_value` Validate that the duration provided is no greater than this value.
+- `min_value` Validate that the duration provided is no less than this value.
 
 ---
 
@@ -588,8 +591,8 @@ Let's look at an example of serializing a class that represents an RGB color val
         """
         Color objects are serialized into 'rgb(#, #, #)' notation.
         """
-        def to_representation(self, obj):
-            return "rgb(%d, %d, %d)" % (obj.red, obj.green, obj.blue)
+        def to_representation(self, value):
+            return "rgb(%d, %d, %d)" % (value.red, value.green, value.blue)
 
         def to_internal_value(self, data):
             data = data.strip('rgb(').rstrip(')')
@@ -601,16 +604,16 @@ By default field values are treated as mapping to an attribute on the object.  I
 As an example, let's create a field that can be used to represent the class name of the object being serialized:
 
     class ClassNameField(serializers.Field):
-        def get_attribute(self, obj):
+        def get_attribute(self, instance):
             # We pass the object instance onto `to_representation`,
             # not just the field attribute.
-            return obj
+            return instance
 
-        def to_representation(self, obj):
+        def to_representation(self, value):
             """
-            Serialize the object's class name.
+            Serialize the value's class name.
             """
-            return obj.__class__.__name__
+            return value.__class__.__name__
 
 ### Raising validation errors
 
@@ -672,10 +675,10 @@ the coordinate pair:
 
     class CoordinateField(serializers.Field):
 
-        def to_representation(self, obj):
+        def to_representation(self, value):
             ret = {
-                "x": obj.x_coordinate,
-                "y": obj.y_coordinate
+                "x": value.x_coordinate,
+                "y": value.y_coordinate
             }
             return ret
 
@@ -801,7 +804,7 @@ The [drf-compound-fields][drf-compound-fields] package provides "compound" seria
 
 The [drf-extra-fields][drf-extra-fields] package provides extra serializer fields for REST framework, including `Base64ImageField` and `PointField` classes.
 
-## djangrestframework-recursive
+## djangorestframework-recursive
 
 the [djangorestframework-recursive][djangorestframework-recursive] package provides a `RecursiveField` for serializing and deserializing recursive structures
 

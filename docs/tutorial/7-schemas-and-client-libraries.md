@@ -42,12 +42,12 @@ from rest_framework.schemas import get_schema_view
 schema_view = get_schema_view(title='Pastebin API')
 
 urlpatterns = [
-    url(r'^schema/$', schema_view),
+    path('schema/', schema_view),
     ...
 ]
 ```
 
-If you visit the API root endpoint in a browser you should now see `corejson`
+If you visit the `/schema/` endpoint in a browser you should now see `corejson`
 representation become available as an option.
 
 ![Schema format](../img/corejson-format.png)
@@ -89,7 +89,7 @@ Now check that it is available on the command line...
 
       Command line client for interacting with CoreAPI services.
 
-      Visit http://www.coreapi.org for more information.
+      Visit https://www.coreapi.org/ for more information.
 
     Options:
       --version  Display the package version number.
@@ -220,8 +220,8 @@ We've reached the end of our tutorial.  If you want to get more involved in the 
 
 **Now go build awesome things.**
 
-[coreapi]: http://www.coreapi.org
-[corejson]: http://www.coreapi.org/specification/encoding/#core-json-encoding
+[coreapi]: https://www.coreapi.org/
+[corejson]: https://www.coreapi.org/specification/encoding/#core-json-encoding
 [openapi]: https://openapis.org/
 [repo]: https://github.com/encode/rest-framework-tutorial
 [sandbox]: https://restframework.herokuapp.com/

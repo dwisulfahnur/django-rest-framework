@@ -14,6 +14,9 @@ from rest_framework import fields, relations, serializers
 from rest_framework.compat import unicode_repr
 from rest_framework.fields import Field
 
+from .models import (
+    ForeignKeyTarget, NestedForeignKeySource, NullableForeignKeySource
+)
 from .utils import MockObject
 
 try:
@@ -381,14 +384,6 @@ class TestNotRequiredOutput:
         serializer.save()
         assert serializer.data == {'included': 'abc'}
 
-    def test_not_required_output_for_allow_null_field(self):
-        class ExampleSerializer(serializers.Serializer):
-            omitted = serializers.CharField(required=False, allow_null=True)
-            included = serializers.CharField()
-
-        serializer = ExampleSerializer({'included': 'abc'})
-        assert 'omitted' not in serializer.data
-
 
 class TestDefaultOutput:
     def setup(self):
@@ -453,6 +448,22 @@ class TestDefaultOutput:
 
         assert Serializer({'a': {'b': {'c': 'abc'}}}).data == {'c': 'abc'}
 
+        # Same test using model objects to exercise both paths in
+        # rest_framework.fields.get_attribute() (#5880)
+        class ModelSerializer(serializers.Serializer):
+            target = serializers.CharField(default='x', source='target.target.name')
+
+        a = NestedForeignKeySource(name="Root Object", target=None)
+        assert ModelSerializer(a).data == {'target': 'x'}
+
+        b = NullableForeignKeySource(name="Intermediary Object", target=None)
+        a.target = b
+        assert ModelSerializer(a).data == {'target': 'x'}
+
+        c = ForeignKeyTarget(name="Target Object")
+        b.target = c
+        assert ModelSerializer(a).data == {'target': 'Target Object'}
+
     def test_default_for_nested_serializer(self):
         class NestedSerializer(serializers.Serializer):
             a = serializers.CharField(default='1')
@@ -467,12 +478,16 @@ class TestDefaultOutput:
         assert Serializer({'nested': {'a': '3', 'b': {'c': '4'}}}).data == {'nested': {'a': '3', 'c': '4'}}
 
     def test_default_for_allow_null(self):
-        # allow_null=True should imply default=None
+        """
+        Without an explicit default, allow_null implies default=None when serializing. #5518 #5708
+        """
         class Serializer(serializers.Serializer):
             foo = serializers.CharField()
             bar = serializers.CharField(source='foo.bar', allow_null=True)
+            optional = serializers.CharField(required=False, allow_null=True)
 
-        assert Serializer({'foo': None}).data == {'foo': None, 'bar': None}
+        # allow_null=True should imply default=None when serialising:
+        assert Serializer({'foo': None}).data == {'foo': None, 'bar': None, 'optional': None, }
 
 
 class TestCacheSerializerData:
@@ -494,7 +509,7 @@ class TestCacheSerializerData:
 class TestDefaultInclusions:
     def setup(self):
         class ExampleSerializer(serializers.Serializer):
-            char = serializers.CharField(read_only=True, default='abc')
+            char = serializers.CharField(default='abc')
             integer = serializers.IntegerField()
         self.Serializer = ExampleSerializer
 

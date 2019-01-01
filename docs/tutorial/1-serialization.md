@@ -33,7 +33,7 @@ Okay, we're ready to get coding.
 To get started, let's create a new project to work with.
 
     cd ~
-    django-admin.py startproject tutorial
+    django-admin startproject tutorial
     cd tutorial
 
 Once that's done we can create an app that we'll use to create a simple Web API.
@@ -154,9 +154,9 @@ At this point we've translated the model instance into Python native datatypes. 
 
 Deserialization is similar.  First we parse a stream into Python native datatypes...
 
-    from django.utils.six import BytesIO
+    import io
 
-    stream = BytesIO(content)
+    stream = io.BytesIO(content)
     data = JSONParser().parse(stream)
 
 ...then we restore those native datatypes into a fully populated object instance.
@@ -275,20 +275,20 @@ We'll also need a view which corresponds to an individual snippet, and can be us
 
 Finally we need to wire these views up.  Create the `snippets/urls.py` file:
 
-    from django.conf.urls import url
+    from django.urls import path
     from snippets import views
 
     urlpatterns = [
-        url(r'^snippets/$', views.snippet_list),
-        url(r'^snippets/(?P<pk>[0-9]+)/$', views.snippet_detail),
+        path('snippets/', views.snippet_list),
+        path('snippets/<int:pk>/', views.snippet_detail),
     ]
 
 We also need to wire up the root urlconf, in the `tutorial/urls.py` file, to include our snippet app's URLs.
 
-    from django.conf.urls import url, include
+    from django.urls import path, include
 
     urlpatterns = [
-        url(r'^', include('snippets.urls')),
+        path('', include('snippets.urls')),
     ]
 
 It's worth noting that there are a couple of edge cases we're not dealing with properly at the moment.  If we send malformed `json`, or if a request is made with a method that the view doesn't handle, then we'll end up with a 500 "server error" response.  Still, this'll do for now.
@@ -299,18 +299,18 @@ Now we can start up a sample server that serves our snippets.
 
 Quit out of the shell...
 
-	quit()
+    quit()
 
 ...and start up Django's development server.
 
-	python manage.py runserver
+    python manage.py runserver
 
-	Validating models...
+    Validating models...
 
-	0 errors found
-	Django version 1.11, using settings 'tutorial.settings'
-	Development server is running at http://127.0.0.1:8000/
-	Quit the server with CONTROL-C.
+    0 errors found
+    Django version 1.11, using settings 'tutorial.settings'
+    Development server is running at http://127.0.0.1:8000/
+    Quit the server with CONTROL-C.
 
 In another terminal window, we can test the server.
 

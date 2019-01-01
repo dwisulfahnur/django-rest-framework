@@ -2,8 +2,10 @@ from __future__ import unicode_literals
 
 import base64
 import unittest
+import warnings
 
-from django.contrib.auth.models import Group, Permission, User
+import django
+from django.contrib.auth.models import AnonymousUser, Group, Permission, User
 from django.db import models
 from django.test import TestCase
 from django.urls import ResolverMatch
@@ -12,7 +14,7 @@ from rest_framework import (
     HTTP_HEADER_ENCODING, authentication, generics, permissions, serializers,
     status, views
 )
-from rest_framework.compat import guardian
+from rest_framework.compat import is_guardian_installed
 from rest_framework.filters import DjangoObjectPermissionsFilter
 from rest_framework.routers import DefaultRouter
 from rest_framework.test import APIRequestFactory
@@ -248,10 +250,12 @@ class BasicPermModel(models.Model):
 
     class Meta:
         app_label = 'tests'
-        permissions = (
-            ('view_basicpermmodel', 'Can view basic perm model'),
-            # add, change, delete built in to django
-        )
+
+        if django.VERSION < (2, 1):
+            permissions = (
+                ('view_basicpermmodel', 'Can view basic perm model'),
+                # add, change, delete built in to django
+            )
 
 
 class BasicPermSerializer(serializers.ModelSerializer):
@@ -305,7 +309,7 @@ class GetQuerysetObjectPermissionInstanceView(generics.RetrieveUpdateDestroyAPIV
 get_queryset_object_permissions_view = GetQuerysetObjectPermissionInstanceView.as_view()
 
 
-@unittest.skipUnless(guardian, 'django-guardian not installed')
+@unittest.skipUnless(is_guardian_installed(), 'django-guardian not installed')
 class ObjectPermissionsIntegrationTests(TestCase):
     """
     Integration tests for the object level permissions API.
@@ -414,17 +418,34 @@ class ObjectPermissionsIntegrationTests(TestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
     # Read list
+    def test_django_object_permissions_filter_deprecated(self):
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            DjangoObjectPermissionsFilter()
+
+        message = ("`DjangoObjectPermissionsFilter` has been deprecated and moved "
+                   "to the 3rd-party django-rest-framework-guardian package.")
+        self.assertEqual(len(w), 1)
+        self.assertIs(w[-1].category, DeprecationWarning)
+        self.assertEqual(str(w[-1].message), message)
+
     def test_can_read_list_permissions(self):
         request = factory.get('/', HTTP_AUTHORIZATION=self.credentials['readonly'])
         object_permissions_list_view.cls.filter_backends = (DjangoObjectPermissionsFilter,)
-        response = object_permissions_list_view(request)
+        # TODO: remove in version 3.10
+        with warnings.catch_warnings(record=True):
+            warnings.simplefilter("always")
+            response = object_permissions_list_view(request)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data[0].get('id'), 1)
 
     def test_cannot_read_list_permissions(self):
         request = factory.get('/', HTTP_AUTHORIZATION=self.credentials['writeonly'])
         object_permissions_list_view.cls.filter_backends = (DjangoObjectPermissionsFilter,)
-        response = object_permissions_list_view(request)
+        # TODO: remove in version 3.10
+        with warnings.catch_warnings(record=True):
+            warnings.simplefilter("always")
+            response = object_permissions_list_view(request)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertListEqual(response.data, [])
 
@@ -519,3 +540,63 @@ class CustomPermissionsTests(TestCase):
             detail = response.data.get('detail')
             self.assertEqual(response.status_code, status.HTTP_403_FORBIDDEN)
             self.assertEqual(detail, self.custom_message)
+
+
+class PermissionsCompositionTests(TestCase):
+
+    def setUp(self):
+        self.username = 'john'
+        self.email = 'lennon@thebeatles.com'
+        self.password = 'password'
+        self.user = User.objects.create_user(
+            self.username,
+            self.email,
+            self.password
+        )
+        self.client.login(username=self.username, password=self.password)
+
+    def test_and_false(self):
+        request = factory.get('/1', format='json')
+        request.user = AnonymousUser()
+        composed_perm = permissions.IsAuthenticated & permissions.AllowAny
+        assert composed_perm().has_permission(request, None) is False
+
+    def test_and_true(self):
+        request = factory.get('/1', format='json')
+        request.user = self.user
+        composed_perm = permissions.IsAuthenticated & permissions.AllowAny
+        assert composed_perm().has_permission(request, None) is True
+
+    def test_or_false(self):
+        request = factory.get('/1', format='json')
+        request.user = AnonymousUser()
+        composed_perm = permissions.IsAuthenticated | permissions.AllowAny
+        assert composed_perm().has_permission(request, None) is True
+
+    def test_or_true(self):
+        request = factory.get('/1', format='json')
+        request.user = self.user
+        composed_perm = permissions.IsAuthenticated | permissions.AllowAny
+        assert composed_perm().has_permission(request, None) is True
+
+    def test_several_levels(self):
+        request = factory.get('/1', format='json')
+        request.user = self.user
+        composed_perm = (
+            permissions.IsAuthenticated &
+            permissions.IsAuthenticated &
+            permissions.IsAuthenticated &
+            permissions.IsAuthenticated
+        )
+        assert composed_perm().has_permission(request, None) is True
+
+    def test_several_levels_and_precedence(self):
+        request = factory.get('/1', format='json')
+        request.user = self.user
+        composed_perm = (
+            permissions.IsAuthenticated &
+            permissions.IsAuthenticated |
+            permissions.IsAuthenticated &
+            permissions.IsAuthenticated
+        )
+        assert composed_perm().has_permission(request, None) is True
